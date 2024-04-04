@@ -1,0 +1,44 @@
+Default exports in Common/Node JS Modules 
+
+Ex1.const greetings = require("../greeting/index");
+let msg = `Hello Rahul! ${greetings}`;
+module.exports = msg;
+
+Ex2. const names = require("../country/state/city/index");
+const getFirstNames = require("../utilities/utils/index");
+
+const getPeopleInCity = (names) => {
+  const out = getFirstNames(names);
+  return out;
+};
+
+module.exports = getPeopleInCity;
+
+Ex3. const ratio = require("../ratio/index");
+const factorial = require("../factorial/index");
+
+const ratioAndFactorial = (a, b, c) => {
+  let ratioOfAAndB = ratio(a, b);
+  let factorialOfC = factorial(c);
+  return (out = {
+    ratio: ratioOfAAndB,
+    factorial: factorialOfC,
+  });
+};
+
+console.log(ratioAndFactorial(4, 2, 3));
+
+module.exports = ratioAndFactorial;
+
+Ex4. const addDays = require("date-fns/addDays");
+
+const getDateAfterXDays = (days) => {
+  const newDate = addDays(new Date(2020, 8, 22), days);
+  return `${newDate.getDate()}-${newDate.getMonth()}-${newDate.getFullYear()}`;
+};
+
+console.log(getDateAfterXDays(6));
+
+module.exports = getDateAfterXDays;
+
+
