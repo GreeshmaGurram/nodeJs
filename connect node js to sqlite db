@@ -3,25 +3,102 @@ const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const path = require("path");
 const app = express();
+// recognises the incoming of json data and parses it accordingly
+app.use(express.json()) 
 let db = null
 const dbPath = path.join( __dirname, "goodreads.db");
+// __dirname gives path of the current JS file
 const initialiseDbAndServer = async() => {
+// try catch for error hsndling of database
   try{
+//initialise db
     const db = await open({
       filename: dbPath,
       driver: sqlite3.Database
     });
+//initialise server
     app.listen(3000, () => {
       console.log("The Server started at http://localhost:3000")
     })
   }catch(e){
+//force node js to stop the process
   process.exit(1)
   }
 }
 initialiseDbAndServer();
 
+// GET books API
 app.get("/books/", async(request, response) => {
   const getBooksArray = `SELECT * from books ORDER_BY book_id`;
   const booksArray = await db.all(getBooksArray);
   response.send(booksArray);
 })
+
+//GET book API
+app.get("/books/:bookId", async(request, response) => {
+  const { bookId } = request.params
+  const getBookQuery = `SELECT * from book where book_id = ${bookId}`
+  const book = await db.get(getBookQuery)
+  response.send(book);
+});
+
+// ADD book API
+app.post("/books", async(request, response) => {
+  const bookDetails = request.body;
+  const {title, authorId, rating ...} = bookDetails;
+  const addBookQuery = `INSERT into book (title, autor_id, rating...) values (${title}, ${authorId}, ${rating}...)`
+  const dbResponse = await db.run(addBookQuery);
+  const bookId = dbResponse.lastID;
+  response.send({ bookId: bookId })
+})
+
+// UPDATE book API
+app.put("/books/:bookId/", async(request, response) => {
+  const { bookId } = request.params;
+  const bookDetails = request.body;
+  const {title, authorId, rating ...} = bookDetails;
+  const updateBookQuery = `UPDATE book SET title = ${title}, author_id = ${authorId}, rating = ${rating}...`
+  await db.run(updateBookQuery);
+  response.send("Book Update Successfully");
+})
+
+//DELETE book API
+app.delete("/books/:bookId/", async(request, response) => {
+  const { bookId } = request.params;
+  const deleteBookQuery = `delete from book where book_id = ${bookId}`
+  await db.run(deleteBookQuery);
+  response.send("Book deleted Successfully");
+})
+
+//GET books by author
+app.get("/author/:authorId/books/", async(request, response) => {
+  const {authorId} = request.params;
+  const getBookByAuthorQuery =  `select * from book where autor_id = ${authorId}`
+  const books = await db.all(getBookByAuthorQuery)
+  response.send(books);
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
