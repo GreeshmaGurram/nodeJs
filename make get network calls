@@ -1,0 +1,62 @@
+GET METHOD: 
+  1. Get a string as response when client from http://localhost:3000 request for getting some resource located at "/" path in the server
+  // default import of 3rd party package express js
+const express = require("express");
+// create the instance of express server and assign it to app
+const app = express();
+
+app.get("/", (request, response) => {
+  response.send("Express JS");
+});
+
+// start the server instance and listen to port 3000
+app.listen(3000);
+
+2. Get a html file as a response
+const express = require("express");
+const app = express();
+
+app.get("/gadgets", (request, response) => {
+  response.sendFile("./gadgets.html", { root: __dirname });
+});
+
+module.exports = app;
+
+
+3. call 2 apis
+const express = require("express");
+const app = express();
+
+app.get("/", (request, response) => {
+  response.send("Home Page");
+});
+
+app.get("/about", (request, response) => {
+  response.send("About Page");
+});
+
+app.listen(3000);
+
+4. get today's date
+const express = require("express");
+const app = express();
+
+app.get("/", (request, response) => {
+  let date = new Date();
+  response.send(`${date.getDate()}-${date.getMonth()}-${date.getFullYear()}`);
+});
+
+module.exports = app;
+
+4.get date after 100 days from today using date-fns 3rd party package
+
+
+
+
+
+
+
+
+
+
+
