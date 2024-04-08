@@ -1,0 +1,181 @@
+const express = require("express");
+const sqlite3 = require("sqlite3");
+const { open } = require("sqlite");
+const path = require("path");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+const app = express();
+app.use(express.json());
+
+let db = null;
+let dbPath = path.join(__dirname, "covid19IndiaPortal.db");
+
+const initializeDb = async () => {
+  try {
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database,
+    });
+  } catch (e) {
+    console.log(`DB Error: ${e.message}`);
+    process.exit(1);
+  }
+};
+
+initializeDb();
+
+const authenticateToken = (request, response, next) => {
+  const authenticationHeader = request.headers["authorization"];
+  let jwtToken;
+  if (authenticationHeader !== undefined) {
+    jwtToken = authenticationHeader.split(" ")[1];
+    if (jwtToken === undefined) {
+      response.status(401);
+      response.send("Invalid JWT Token");
+    } else {
+      jwt.verify(jwtToken, "My_secret_is_you", async (error, payload) => {
+        if (error) {
+          response.status(401);
+          response.send("Invalid JWT Token");
+        } else {
+          request.username = payload.username;
+          next();
+        }
+      });
+    }
+  } else {
+    response.status(401);
+    response.send("Invalid JWT Token");
+  }
+};
+
+const convertStateTableColNamesToCamelCase = (obj) => {
+  return {
+    stateId: obj.state_id,
+    stateName: obj.state_name,
+    population: obj.population,
+  };
+};
+
+const convertDistrictTableColNamesToCamelCase = (obj) => {
+  return {
+    districtId: obj.district_id,
+    districtName: obj.district_name,
+    stateId: obj.state_id,
+    cases: obj.cases,
+    cured: obj.cured,
+    active: obj.active,
+    deaths: obj.deaths,
+  };
+};
+
+// Login API
+app.post("/login/", async (request, response) => {
+  const { username, password } = request.body;
+  const selectUserQuery = `SELECT * from user WHERE username='${username}';`;
+  const user = await db.get(selectUserQuery);
+  if (user === undefined) {
+    response.status(400);
+    response.send("Invalid user");
+  } else {
+    const isPasswordMatched = await bcrypt.compare(password, user.password);
+    if (isPasswordMatched === false) {
+      response.status(400);
+      response.send("Invalid password");
+    } else {
+      let payload = { username: username };
+      const jwtToken = jwt.sign(payload, "My_secret_is_you");
+      response.send({ jwtToken: jwtToken });
+    }
+  }
+});
+
+// Get states API
+app.get("/states/", authenticateToken, async (request, response) => {
+  const getStatesQuery = `SELECT * from state`;
+  const statesArray = await db.all(getStatesQuery);
+  response.send(
+    statesArray.map((state) => convertStateTableColNamesToCamelCase(state))
+  );
+});
+
+// Get state API
+app.get("/states/:stateId/", authenticateToken, async (request, response) => {
+  const { stateId } = request.params;
+  const getStateQuery = `SELECT * FROM state WHERE state_id=${stateId}`;
+  const state = await db.get(getStateQuery);
+  response.send(convertStateTableColNamesToCamelCase(state));
+});
+
+// Post district API
+app.post("/districts/", authenticateToken, async (request, response) => {
+  const { districtName, stateId, cases, cured, active, deaths } = request.body;
+  const addDistrictQuery = `INSERT INTO district
+    (district_name, state_id, cases, cured, active, deaths)
+    VALUES
+    ('${districtName}', ${stateId}, ${cases}, ${cured}, ${active}, ${deaths});
+    `;
+  await db.run(addDistrictQuery);
+  response.send("District Successfully Added");
+});
+
+// Get district API
+app.get(
+  "/districts/:districtId/",
+  authenticateToken,
+  async (request, response) => {
+    const { districtId } = request.params;
+    const getDistrictQuery = `SELECT * FROM district WHERE district_id=${districtId}`;
+    const district = await db.get(getDistrictQuery);
+    response.send(convertDistrictTableColNamesToCamelCase(district));
+  }
+);
+
+// Delete district API
+app.delete(
+  "/districts/:districtId/",
+  authenticateToken,
+  async (request, response) => {
+    const { districtId } = request.params;
+    const deleteDistrictQuery = `DELETE FROM district WHERE district_id=${districtId}`;
+    await db.run(deleteDistrictQuery);
+    response.send("District Removed");
+  }
+);
+
+// Update district API
+app.put(
+  "/districts/:districtId/",
+  authenticateToken,
+  async (request, response) => {
+    const { districtId } = request.params;
+    const {
+      districtName,
+      stateId,
+      cases,
+      cured,
+      active,
+      deaths,
+    } = request.body;
+    const updateDistrictQuery = `UPDATE district SET district_name='${districtName}', state_id=${stateId}, cases=${cases}, cured=${cured}, active=${active}, deaths=${deaths}`;
+    await db.run(updateDistrictQuery);
+    response.send("District Details Updated");
+  }
+);
+
+//Get stats API
+app.get(
+  "/states/:stateId/stats/",
+  authenticateToken,
+  async (request, response) => {
+    const { stateId } = request.params;
+    const getStatsQuery = `SELECT SUM(cases) AS totalCases,
+    SUM(cured) AS totalCured, SUM(active) AS totalActive,
+    SUM(deaths) AS totalDeaths FROM district WHERE state_id=${stateId}`;
+    const stats = await db.get(getStatsQuery);
+    response.send(stats);
+  }
+);
+
+module.exports = app;
